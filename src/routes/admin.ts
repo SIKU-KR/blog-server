@@ -7,10 +7,18 @@
  * DELETE /admin/posts/:postId - Delete post
  * DELETE /admin/comments/:commentId - Delete comment
  * POST /admin/images - Upload image
+ * POST /admin/posts/:postId/embed - Generate embedding for single post
+ * POST /admin/posts/embed/bulk - Bulk generate embeddings for all posts
  */
 
 import { Hono } from "hono";
-import { PostService, CommentService, ImageService } from "../services";
+import {
+  PostService,
+  CommentService,
+  ImageService,
+  EmbeddingService,
+} from "../services";
+import { PostRepository } from "../repositories";
 import { authMiddleware } from "../auth";
 import { toAPIError, ValidationError } from "../utils/errors";
 import { createLogger } from "../utils/logger";
@@ -28,7 +36,11 @@ admin.post("/posts", async (c) => {
 
   try {
     const body = await c.req.json();
-    const postService = new PostService(c.env.DB);
+    const postService = new PostService(
+      c.env.DB,
+      c.env.VECTORIZE,
+      c.env.OPENAI_API_KEY
+    );
     const result = await postService.createPost(body, logger);
 
     return c.json(result, 200);
@@ -52,7 +64,11 @@ admin.put("/posts/:postId", async (c) => {
     }
 
     const body = await c.req.json();
-    const postService = new PostService(c.env.DB);
+    const postService = new PostService(
+      c.env.DB,
+      c.env.VECTORIZE,
+      c.env.OPENAI_API_KEY
+    );
     const result = await postService.updatePost(postId, body, logger);
 
     return c.json(result, 200);
@@ -75,7 +91,11 @@ admin.delete("/posts/:postId", async (c) => {
       throw new ValidationError("Invalid post ID");
     }
 
-    const postService = new PostService(c.env.DB);
+    const postService = new PostService(
+      c.env.DB,
+      c.env.VECTORIZE,
+      c.env.OPENAI_API_KEY
+    );
     const result = await postService.deletePost(postId, logger);
 
     return c.json(result, 200);
@@ -113,6 +133,71 @@ admin.post("/images", async (c) => {
 
     const imageService = new ImageService(c.env.STORAGE, c.env.CDN_DOMAIN);
     const result = await imageService.uploadImage(file, logger);
+
+    return c.json(result, 200);
+  } catch (error) {
+    const apiError = toAPIError(error);
+    return c.json({ error: apiError.message }, apiError.status as 400 | 500);
+  }
+});
+
+// POST /admin/posts/:postId/embed - Generate embedding for single post
+admin.post("/posts/:postId/embed", async (c) => {
+  const requestId = c.get("requestId") || crypto.randomUUID();
+  const logger = createLogger(requestId);
+
+  try {
+    const postIdParam = c.req.param("postId");
+    const postId = parseInt(postIdParam, 10);
+
+    if (isNaN(postId)) {
+      throw new ValidationError("Invalid post ID");
+    }
+
+    const postService = new PostService(
+      c.env.DB,
+      c.env.VECTORIZE,
+      c.env.OPENAI_API_KEY
+    );
+    const result = await postService.generateEmbeddingForPost(postId, logger);
+
+    if (!result.success) {
+      return c.json({ error: result.error }, 400);
+    }
+
+    return c.json({ success: true, postId }, 200);
+  } catch (error) {
+    const apiError = toAPIError(error);
+    return c.json({ error: apiError.message }, apiError.status as 400 | 404 | 500);
+  }
+});
+
+// POST /admin/posts/embed/bulk - Bulk generate embeddings for all posts
+admin.post("/posts/embed/bulk", async (c) => {
+  const requestId = c.get("requestId") || crypto.randomUUID();
+  const logger = createLogger(requestId);
+
+  try {
+    const postRepository = new PostRepository(c.env.DB);
+    const embeddingService = new EmbeddingService(
+      c.env.VECTORIZE,
+      c.env.OPENAI_API_KEY
+    );
+
+    // Get all posts
+    const posts = await postRepository.findAllForEmbedding();
+
+    const result = await embeddingService.bulkIndexPosts(
+      posts.map((p) => ({
+        id: p.id,
+        title: p.title,
+        content: p.content,
+        slug: p.slug,
+        state: p.state,
+        publishedAt: p.state === "published" ? p.created_at : null,
+      })),
+      logger
+    );
 
     return c.json(result, 200);
   } catch (error) {

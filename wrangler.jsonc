@@ -1,44 +1,53 @@
 {
-  "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "blog-server",
-  "main": "src/index.ts",
-  "compatibility_date": "2025-12-31",
-  "compatibility_flags": ["nodejs_compat"],
-
-  // Environment variables
-  "vars": {
-    "ENVIRONMENT": "production",
-    "ALLOWED_ORIGINS": "*",
-    "JWT_EXPIRY": "7200",
-    "CDN_DOMAIN": "pub-5e4858d1f4a945f983eb087580355811.r2.dev"
-  },
-
-  // D1 Database Binding
-  "d1_databases": [
-    {
-      "binding": "DB",
-      "database_name": "blog",
-      "database_id": "1da591ba-005a-41ef-86dd-f8755b06092d"
-    }
-  ],
-
-  // R2 Bucket Binding
-  "r2_buckets": [
-    {
-      "binding": "STORAGE",
-      "bucket_name": "blog-images"
-    }
-  ],
-
-  // Observability
-  "observability": {
-    "enabled": true,
-    "head_sampling_rate": 1
-  }
-
-  // Secrets (set via `wrangler secret put`):
-  // - JWT_SECRET: Base64-encoded HMAC key (32 bytes min)
-  // - PASSWORD_SALT: Hex-encoded salt (16 bytes)
-  // - ADMIN_USERNAME: Admin username (plain text)
-  // - ADMIN_PASSWORD: SHA-256 hash of password+salt
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "blog-server",
+	"main": "src/index.ts",
+	"compatibility_date": "2025-12-31",
+	"compatibility_flags": [
+		"nodejs_compat"
+	],
+	// Environment variables
+	"vars": {
+		"ENVIRONMENT": "production",
+		"ALLOWED_ORIGINS": "*",
+		"JWT_EXPIRY": "7200",
+		"CDN_DOMAIN": "pub-5e4858d1f4a945f983eb087580355811.r2.dev"
+	},
+	// D1 Database Binding
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "blog",
+			"database_id": "1da591ba-005a-41ef-86dd-f8755b06092d"
+		}
+	],
+	// R2 Bucket Binding
+	"r2_buckets": [
+		{
+			"binding": "STORAGE",
+			"bucket_name": "blog-images"
+		}
+	],
+	// Vectorize binding
+	"vectorize": [
+		{
+			"binding": "VECTORIZE",
+			"index_name": "blog-post-embeddings"
+		},
+		{
+			"binding": "VECTORIZE",
+			"index_name": "blog-post-embeddings"
+		}
+	],
+	// Observability
+	"observability": {
+		"enabled": true,
+		"head_sampling_rate": 1
+	}
+	// Secrets (set via `wrangler secret put`):
+	// - JWT_SECRET: Base64-encoded HMAC key (32 bytes min)
+	// - PASSWORD_SALT: Hex-encoded salt (16 bytes)
+	// - ADMIN_USERNAME: Admin username (plain text)
+	// - ADMIN_PASSWORD: SHA-256 hash of password+salt
+	// - OPENAI_API_KEY: OpenAI API key for embeddings
 }

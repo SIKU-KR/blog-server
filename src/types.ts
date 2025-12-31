@@ -9,6 +9,9 @@ export interface Env {
   // R2 Storage
   STORAGE: R2Bucket;
 
+  // Vectorize
+  VECTORIZE: VectorizeIndex;
+
   // Environment variables
   ENVIRONMENT: string;
   ALLOWED_ORIGINS: string;
@@ -20,6 +23,7 @@ export interface Env {
   PASSWORD_SALT: string;
   ADMIN_USERNAME: string;
   ADMIN_PASSWORD: string;
+  OPENAI_API_KEY: string;
 }
 
 export interface JWTPayload {
@@ -110,4 +114,52 @@ export interface Logger {
   info: (message: string, context?: Record<string, unknown>) => void;
   warn: (message: string, context?: Record<string, unknown>) => void;
   error: (message: string, context?: Record<string, unknown>) => void;
+}
+
+// Embedding types
+export interface PostVectorMetadata {
+  postId: number;
+  title: string;
+  slug: string;
+  state: "draft" | "published";
+  publishedAt: string | null;
+}
+
+export interface RelatedPost {
+  id: number;
+  slug: string;
+  title: string;
+  score: number;
+}
+
+export interface PostWithRelated extends PostWithTags {
+  relatedPosts: RelatedPost[];
+}
+
+export interface OpenAIEmbeddingResponse {
+  object: string;
+  data: Array<{
+    object: string;
+    index: number;
+    embedding: number[];
+  }>;
+  model: string;
+  usage: {
+    prompt_tokens: number;
+    total_tokens: number;
+  };
+}
+
+export interface EmbeddingResult {
+  success: boolean;
+  postId: number;
+  vectorId?: string;
+  error?: string;
+}
+
+export interface BulkEmbeddingResult {
+  total: number;
+  succeeded: number;
+  failed: number;
+  results: EmbeddingResult[];
 }

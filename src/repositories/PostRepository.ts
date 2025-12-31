@@ -256,4 +256,18 @@ export class PostRepository {
 
     return tagsByPost;
   }
+
+  /**
+   * Get all posts for bulk embedding migration
+   */
+  async findAllForEmbedding(): Promise<Post[]> {
+    const query = `
+      SELECT id, slug, title, content, summary, state, created_at, updated_at, views
+      FROM posts
+      ORDER BY created_at DESC
+    `;
+
+    const result = await this.db.prepare(query).all<Post>();
+    return result.results;
+  }
 }

@@ -52,12 +52,16 @@ publicRoutes.get("/posts", async (c) => {
   }
 });
 
-// GET /posts/:slug - Get single post
+// GET /posts/:slug - Get single post with related posts
 publicRoutes.get("/posts/:slug", async (c) => {
   try {
     const slug = c.req.param("slug");
-    const postService = new PostService(c.env.DB);
-    const result = await postService.getPostBySlug(slug);
+    const postService = new PostService(
+      c.env.DB,
+      c.env.VECTORIZE,
+      c.env.OPENAI_API_KEY
+    );
+    const result = await postService.getPostBySlugWithRelated(slug);
 
     // If numeric ID, redirect to slug URL
     if (result.redirect) {

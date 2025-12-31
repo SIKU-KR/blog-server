@@ -4,19 +4,37 @@
  */
 
 import { PostRepository } from "../repositories";
+import { EmbeddingService } from "./EmbeddingService";
 import { ValidationError, NotFoundError } from "../utils/errors";
 import {
   validatePostRequest,
   validatePagination,
   validateSorting,
 } from "../utils/validation";
-import type { Logger, PostWithTags, PostListItem, PaginatedResponse } from "../types";
+import type {
+  Logger,
+  PostWithTags,
+  PostListItem,
+  PaginatedResponse,
+  RelatedPost,
+  PostWithRelated,
+} from "../types";
 
 export class PostService {
   private repository: PostRepository;
+  private embeddingService?: EmbeddingService;
 
-  constructor(db: D1Database) {
+  constructor(
+    db: D1Database,
+    vectorize?: VectorizeIndex,
+    openaiApiKey?: string
+  ) {
     this.repository = new PostRepository(db);
+
+    // Only initialize embedding service if bindings are provided
+    if (vectorize && openaiApiKey) {
+      this.embeddingService = new EmbeddingService(vectorize, openaiApiKey);
+    }
   }
 
   generateSlug(title: string): string {
@@ -72,6 +90,11 @@ export class PostService {
     }
 
     const createdPost = await this.getPostWithTags(postId);
+
+    // Trigger embedding generation (non-blocking)
+    if (this.embeddingService && createdPost) {
+      this.triggerEmbedding(createdPost, logger);
+    }
 
     if (logger) {
       logger.info("Post created", { postId, slug });
@@ -129,6 +152,11 @@ export class PostService {
 
     const updatedPost = await this.getPostWithTags(postId);
 
+    // Trigger embedding regeneration (non-blocking)
+    if (this.embeddingService && updatedPost) {
+      this.triggerEmbedding(updatedPost, logger);
+    }
+
     if (logger) {
       logger.info("Post updated", { postId });
     }
@@ -146,6 +174,16 @@ export class PostService {
     }
 
     await this.repository.delete(postId);
+
+    // Delete embedding (non-blocking)
+    if (this.embeddingService) {
+      this.embeddingService.deletePostEmbedding(postId, logger).catch((err) => {
+        logger?.warn("Failed to delete embedding", {
+          postId,
+          error: err instanceof Error ? err.message : "Unknown error",
+        });
+      });
+    }
 
     if (logger) {
       logger.info("Post deleted", { postId });
@@ -324,5 +362,92 @@ export class PostService {
     }
 
     return { views };
+  }
+
+  /**
+   * Get post with related posts using vector similarity
+   */
+  async getPostBySlugWithRelated(
+    slug: string,
+    logger?: Logger
+  ): Promise<
+    | { redirect: true; slug: string }
+    | { redirect: false; data: PostWithRelated }
+  > {
+    const result = await this.getPostBySlug(slug);
+
+    if (result.redirect) {
+      return result;
+    }
+
+    let relatedPosts: RelatedPost[] = [];
+
+    if (this.embeddingService) {
+      relatedPosts = await this.embeddingService.findSimilarPosts(
+        result.data.id,
+        4,
+        logger
+      );
+    }
+
+    return {
+      redirect: false,
+      data: {
+        ...result.data,
+        relatedPosts,
+      },
+    };
+  }
+
+  /**
+   * Manual embedding generation trigger
+   */
+  async generateEmbeddingForPost(
+    postId: number,
+    logger?: Logger
+  ): Promise<{ success: boolean; error?: string }> {
+    if (!this.embeddingService) {
+      return { success: false, error: "Embedding service not configured" };
+    }
+
+    const post = await this.repository.findById(postId);
+    if (!post) {
+      return { success: false, error: "Post not found" };
+    }
+
+    const result = await this.embeddingService.indexPost(
+      post.id,
+      post.title,
+      post.content,
+      post.slug,
+      post.state,
+      post.state === "published" ? post.created_at : null,
+      logger
+    );
+
+    return {
+      success: result.success,
+      error: result.error,
+    };
+  }
+
+  /**
+   * Helper: Non-blocking embedding trigger
+   */
+  private triggerEmbedding(post: PostWithTags, logger?: Logger): void {
+    this.embeddingService!.indexPost(
+      post.id,
+      post.title,
+      post.content,
+      post.slug,
+      post.state,
+      post.state === "published" ? post.createdAt : null,
+      logger
+    ).catch((err) => {
+      logger?.warn("Background embedding failed", {
+        postId: post.id,
+        error: err instanceof Error ? err.message : "Unknown error",
+      });
+    });
   }
 }
