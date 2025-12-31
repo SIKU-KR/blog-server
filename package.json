@@ -2,7 +2,6 @@
   "name": "blog-server",
   "type": "module",
   "scripts": {
-    "preinstall": "npm config set optional true",
     "dev": "wrangler dev",
     "deploy": "wrangler deploy --minify",
     "cf-typegen": "wrangler types --env-interface CloudflareBindings",
