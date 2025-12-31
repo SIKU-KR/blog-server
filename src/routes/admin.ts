@@ -9,6 +9,8 @@
  * POST /admin/images - Upload image
  * POST /admin/posts/:postId/embed - Generate embedding for single post
  * POST /admin/posts/embed/bulk - Bulk generate embeddings for all posts
+ * POST /admin/ai/summary - Generate AI summary for text
+ * POST /admin/ai/slug - Generate AI slug from title and content
  */
 
 import { Hono } from "hono";
@@ -17,6 +19,7 @@ import {
   CommentService,
   ImageService,
   EmbeddingService,
+  AIGenerationService,
 } from "../services";
 import { PostRepository } from "../repositories";
 import { authMiddleware } from "../auth";
@@ -198,6 +201,58 @@ admin.post("/posts/embed/bulk", async (c) => {
       })),
       logger
     );
+
+    return c.json(result, 200);
+  } catch (error) {
+    const apiError = toAPIError(error);
+    return c.json({ error: apiError.message }, apiError.status as 400 | 500);
+  }
+});
+
+// POST /admin/ai/summary - Generate AI summary for text
+admin.post("/ai/summary", async (c) => {
+  const requestId = c.get("requestId") || crypto.randomUUID();
+  const logger = createLogger(requestId);
+
+  try {
+    const body = await c.req.json<{ text: string }>();
+
+    if (!body.text || typeof body.text !== "string") {
+      throw new ValidationError("Text is required");
+    }
+
+    if (body.text.length < 50) {
+      throw new ValidationError("Text must be at least 50 characters");
+    }
+
+    const aiService = new AIGenerationService(c.env.OPENAI_API_KEY);
+    const result = await aiService.generateSummary(body.text, logger);
+
+    return c.json(result, 200);
+  } catch (error) {
+    const apiError = toAPIError(error);
+    return c.json({ error: apiError.message }, apiError.status as 400 | 500);
+  }
+});
+
+// POST /admin/ai/slug - Generate AI slug from title and content
+admin.post("/ai/slug", async (c) => {
+  const requestId = c.get("requestId") || crypto.randomUUID();
+  const logger = createLogger(requestId);
+
+  try {
+    const body = await c.req.json<{ title: string; text: string }>();
+
+    if (!body.title || typeof body.title !== "string") {
+      throw new ValidationError("Title is required");
+    }
+
+    if (!body.text || typeof body.text !== "string") {
+      throw new ValidationError("Text is required");
+    }
+
+    const aiService = new AIGenerationService(c.env.OPENAI_API_KEY);
+    const result = await aiService.generateSlug(body.title, body.text, logger);
 
     return c.json(result, 200);
   } catch (error) {
