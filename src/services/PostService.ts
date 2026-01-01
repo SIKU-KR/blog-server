@@ -24,16 +24,12 @@ export class PostService {
   private repository: PostRepository;
   private embeddingService?: EmbeddingService;
 
-  constructor(
-    db: D1Database,
-    vectorize?: VectorizeIndex,
-    openaiApiKey?: string
-  ) {
+  constructor(db: D1Database, vectorize?: VectorizeIndex, ai?: Ai) {
     this.repository = new PostRepository(db);
 
     // Only initialize embedding service if bindings are provided
-    if (vectorize && openaiApiKey) {
-      this.embeddingService = new EmbeddingService(vectorize, openaiApiKey);
+    if (vectorize && ai) {
+      this.embeddingService = new EmbeddingService(vectorize, ai);
     }
   }
 

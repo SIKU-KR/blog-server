@@ -35,6 +35,10 @@
 			"index_name": "blog-post-embeddings"
 		}
 	],
+	// Workers AI binding
+	"ai": {
+		"binding": "AI"
+	},
 	// Observability
 	"observability": {
 		"enabled": true,
@@ -45,5 +49,5 @@
 	// - PASSWORD_SALT: Hex-encoded salt (16 bytes)
 	// - ADMIN_USERNAME: Admin username (plain text)
 	// - ADMIN_PASSWORD: SHA-256 hash of password+salt
-	// - OPENAI_API_KEY: OpenAI API key for embeddings
+	// - OPENAI_API_KEY: OpenAI API key for AI generation (summary/slug)
 }

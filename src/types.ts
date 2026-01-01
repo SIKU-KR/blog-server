@@ -12,6 +12,9 @@ export interface Env {
   // Vectorize
   VECTORIZE: VectorizeIndex;
 
+  // Workers AI
+  AI: Ai;
+
   // Environment variables
   ENVIRONMENT: string;
   ALLOWED_ORIGINS: string;
@@ -23,7 +26,7 @@ export interface Env {
   PASSWORD_SALT: string;
   ADMIN_USERNAME: string;
   ADMIN_PASSWORD: string;
-  OPENAI_API_KEY: string;
+  OPENAI_API_KEY: string; // For AIGenerationService (summary/slug generation)
 }
 
 export interface JWTPayload {
@@ -134,20 +137,6 @@ export interface RelatedPost {
 
 export interface PostWithRelated extends PostWithTags {
   relatedPosts: RelatedPost[];
-}
-
-export interface OpenAIEmbeddingResponse {
-  object: string;
-  data: Array<{
-    object: string;
-    index: number;
-    embedding: number[];
-  }>;
-  model: string;
-  usage: {
-    prompt_tokens: number;
-    total_tokens: number;
-  };
 }
 
 export interface EmbeddingResult {

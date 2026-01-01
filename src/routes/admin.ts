@@ -39,11 +39,7 @@ admin.post("/posts", async (c) => {
 
   try {
     const body = await c.req.json();
-    const postService = new PostService(
-      c.env.DB,
-      c.env.VECTORIZE,
-      c.env.OPENAI_API_KEY
-    );
+    const postService = new PostService(c.env.DB, c.env.VECTORIZE, c.env.AI);
     const result = await postService.createPost(body, logger);
 
     return c.json(result, 200);
@@ -67,11 +63,7 @@ admin.put("/posts/:postId", async (c) => {
     }
 
     const body = await c.req.json();
-    const postService = new PostService(
-      c.env.DB,
-      c.env.VECTORIZE,
-      c.env.OPENAI_API_KEY
-    );
+    const postService = new PostService(c.env.DB, c.env.VECTORIZE, c.env.AI);
     const result = await postService.updatePost(postId, body, logger);
 
     return c.json(result, 200);
@@ -94,11 +86,7 @@ admin.delete("/posts/:postId", async (c) => {
       throw new ValidationError("Invalid post ID");
     }
 
-    const postService = new PostService(
-      c.env.DB,
-      c.env.VECTORIZE,
-      c.env.OPENAI_API_KEY
-    );
+    const postService = new PostService(c.env.DB, c.env.VECTORIZE, c.env.AI);
     const result = await postService.deletePost(postId, logger);
 
     return c.json(result, 200);
@@ -157,11 +145,7 @@ admin.post("/posts/:postId/embed", async (c) => {
       throw new ValidationError("Invalid post ID");
     }
 
-    const postService = new PostService(
-      c.env.DB,
-      c.env.VECTORIZE,
-      c.env.OPENAI_API_KEY
-    );
+    const postService = new PostService(c.env.DB, c.env.VECTORIZE, c.env.AI);
     const result = await postService.generateEmbeddingForPost(postId, logger);
 
     if (!result.success) {
@@ -182,10 +166,7 @@ admin.post("/posts/embed/bulk", async (c) => {
 
   try {
     const postRepository = new PostRepository(c.env.DB);
-    const embeddingService = new EmbeddingService(
-      c.env.VECTORIZE,
-      c.env.OPENAI_API_KEY
-    );
+    const embeddingService = new EmbeddingService(c.env.VECTORIZE, c.env.AI);
 
     // Get all posts
     const posts = await postRepository.findAllForEmbedding();

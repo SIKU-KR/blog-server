@@ -1,34 +1,38 @@
 /**
  * Embedding Service
- * Handles vector embedding generation and similarity search using OpenAI and Cloudflare Vectorize
+ * Handles vector embedding generation and similarity search using Cloudflare Workers AI and Vectorize
  */
 
 import type {
   Logger,
   PostVectorMetadata,
   RelatedPost,
-  OpenAIEmbeddingResponse,
   EmbeddingResult,
   BulkEmbeddingResult,
 } from "../types";
 
-const OPENAI_EMBEDDING_URL = "https://api.openai.com/v1/embeddings";
-const EMBEDDING_MODEL = "text-embedding-3-large";
-const EMBEDDING_DIMENSIONS = 1536;
+// Cloudflare Workers AI BGE-M3 model
+const EMBEDDING_MODEL = "@cf/baai/bge-m3";
 const MAX_RETRIES = 3;
 const RETRY_DELAY_MS = 1000;
 
+// Workers AI embedding response type
+interface WorkersAIEmbeddingResponse {
+  shape: number[];
+  data: number[][];
+}
+
 export class EmbeddingService {
   private vectorize: VectorizeIndex;
-  private openaiApiKey: string;
+  private ai: Ai;
 
-  constructor(vectorize: VectorizeIndex, openaiApiKey: string) {
+  constructor(vectorize: VectorizeIndex, ai: Ai) {
     this.vectorize = vectorize;
-    this.openaiApiKey = openaiApiKey;
+    this.ai = ai;
   }
 
   /**
-   * Generate embedding for post content using OpenAI
+   * Generate embedding for post content using Cloudflare Workers AI BGE-M3
    */
   async generateEmbedding(
     title: string,
@@ -41,37 +45,22 @@ export class EmbeddingService {
 
     for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
       try {
-        const response = await fetch(OPENAI_EMBEDDING_URL, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${this.openaiApiKey}`,
-          },
-          body: JSON.stringify({
-            input: textToEmbed,
-            model: EMBEDDING_MODEL,
-            dimensions: EMBEDDING_DIMENSIONS,
-          }),
-        });
+        const response = await this.ai.run(EMBEDDING_MODEL, {
+          text: [textToEmbed],
+        }) as WorkersAIEmbeddingResponse;
 
-        if (!response.ok) {
-          const errorBody = await response.text();
-          throw new Error(`OpenAI API error: ${response.status} - ${errorBody}`);
+        if (!response.data?.[0]) {
+          throw new Error("Invalid response from Workers AI");
         }
 
-        const data: OpenAIEmbeddingResponse = await response.json();
-
-        if (!data.data?.[0]?.embedding) {
-          throw new Error("Invalid response from OpenAI API");
-        }
+        const embedding = response.data[0];
 
         logger?.debug("Embedding generated", {
           model: EMBEDDING_MODEL,
-          dimensions: data.data[0].embedding.length,
-          tokens: data.usage.total_tokens,
+          dimensions: embedding.length,
         });
 
-        return data.data[0].embedding;
+        return embedding;
       } catch (error) {
         lastError = error as Error;
         logger?.warn(`Embedding generation attempt ${attempt + 1} failed`, {
@@ -162,9 +151,6 @@ export class EmbeddingService {
       const results = await this.vectorize.query(vectors[0].values, {
         topK: topK + 1, // Get extra to filter out self
         returnMetadata: "all",
-        filter: {
-          state: "published",
-        },
       });
 
       const relatedPosts: RelatedPost[] = results.matches
