@@ -140,6 +140,13 @@ export class PostRepository {
       .first<Post>();
   }
 
+  async findPublishedBySlugAndLocale(slug: string, locale: string): Promise<Post | null> {
+    return await this.db
+      .prepare(postQueries.selectPublishedBySlugAndLocale)
+      .bind(slug, locale)
+      .first<Post>();
+  }
+
   async findPublishedById(id: number): Promise<Post | null> {
     return await this.db
       .prepare(postQueries.selectPublishedById)

@@ -413,24 +413,31 @@ export class PostService {
       };
     }
 
-    const post = await this.repository.findPublishedBySlug(slug);
+    // First try to find post with exact locale match
+    let post = locale
+      ? await this.repository.findPublishedBySlugAndLocale(slug, locale)
+      : await this.repository.findPublishedBySlug(slug);
+
+    // If not found with requested locale, try to find any version and redirect
+    if (!post && locale) {
+      const anyLocalePost = await this.repository.findPublishedBySlug(slug);
+      if (anyLocalePost) {
+        const originalId = anyLocalePost.original_post_id || anyLocalePost.id;
+        const translation = await this.repository.findTranslation(originalId, locale);
+        if (translation) {
+          return {
+            redirect: true,
+            slug: translation.slug,
+            locale: translation.locale,
+          };
+        }
+        // No translation exists, return the original post
+        post = anyLocalePost;
+      }
+    }
 
     if (!post) {
       throw new NotFoundError("Post not found");
-    }
-
-    // If locale is specified and doesn't match, try to find the translation
-    if (locale && post.locale !== locale) {
-      // Find if there's a version in the requested locale
-      const originalId = post.original_post_id || post.id;
-      const translation = await this.repository.findTranslation(originalId, locale);
-      if (translation) {
-        return {
-          redirect: true,
-          slug: translation.slug,
-          locale: translation.locale,
-        };
-      }
     }
 
     const tags = await this.repository.getTagsForPost(post.id);
