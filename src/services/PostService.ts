@@ -489,12 +489,13 @@ export class PostService {
    */
   async getPostBySlugWithRelated(
     slug: string,
+    locale: string = "ko",
     logger?: Logger
   ): Promise<
     | { redirect: true; slug: string }
     | { redirect: false; data: PostWithRelated }
   > {
-    const result = await this.getPostBySlug(slug);
+    const result = await this.getPostBySlug(slug, locale);
 
     if (result.redirect) {
       return result;

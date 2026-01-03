@@ -161,7 +161,11 @@ export class PostRepository {
 
     if (tag) {
       query = `
-        SELECT p.id, p.slug, p.title, p.summary, p.locale, p.original_post_id, p.created_at, p.updated_at, p.views
+        SELECT p.id, p.slug, p.title, p.summary, p.locale, p.original_post_id, p.created_at, p.updated_at,
+          COALESCE(
+            (SELECT op.views FROM posts op WHERE op.id = p.original_post_id),
+            p.views
+          ) as views
         FROM posts p
         WHERE p.state = 'published'
           AND p.locale = ?
@@ -178,9 +182,13 @@ export class PostRepository {
       bindings = [locale, tag, limit, offset];
     } else {
       query = `
-        SELECT id, slug, title, summary, locale, original_post_id, created_at, updated_at, views
-        FROM posts
-        WHERE state = 'published' AND locale = ? AND created_at <= datetime('now')
+        SELECT p.id, p.slug, p.title, p.summary, p.locale, p.original_post_id, p.created_at, p.updated_at,
+          COALESCE(
+            (SELECT op.views FROM posts op WHERE op.id = p.original_post_id),
+            p.views
+          ) as views
+        FROM posts p
+        WHERE p.state = 'published' AND p.locale = ? AND p.created_at <= datetime('now')
         ORDER BY ${orderClause}
         LIMIT ? OFFSET ?
       `;
@@ -332,17 +340,25 @@ export class PostRepository {
 
     if (locale) {
       query = `
-        SELECT id, slug, title, summary, state, locale, original_post_id, created_at, updated_at, views
-        FROM posts
-        WHERE locale = ?
+        SELECT p.id, p.slug, p.title, p.summary, p.state, p.locale, p.original_post_id, p.created_at, p.updated_at,
+          COALESCE(
+            (SELECT op.views FROM posts op WHERE op.id = p.original_post_id),
+            p.views
+          ) as views
+        FROM posts p
+        WHERE p.locale = ?
         ORDER BY ${orderClause}
         LIMIT ? OFFSET ?
       `;
       bindings = [locale, limit, offset];
     } else {
       query = `
-        SELECT id, slug, title, summary, state, locale, original_post_id, created_at, updated_at, views
-        FROM posts
+        SELECT p.id, p.slug, p.title, p.summary, p.state, p.locale, p.original_post_id, p.created_at, p.updated_at,
+          COALESCE(
+            (SELECT op.views FROM posts op WHERE op.id = p.original_post_id),
+            p.views
+          ) as views
+        FROM posts p
         ORDER BY ${orderClause}
         LIMIT ? OFFSET ?
       `;

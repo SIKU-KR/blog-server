@@ -57,8 +57,9 @@ publicRoutes.get("/posts", async (c) => {
 publicRoutes.get("/posts/:slug", async (c) => {
   try {
     const slug = c.req.param("slug");
+    const locale = c.req.query("locale") || "ko";
     const postService = new PostService(c.env.DB, c.env.VECTORIZE, c.env.AI);
-    const result = await postService.getPostBySlugWithRelated(slug);
+    const result = await postService.getPostBySlugWithRelated(slug, locale);
 
     // If numeric ID, redirect to slug URL
     if (result.redirect) {
