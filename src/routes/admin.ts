@@ -398,7 +398,7 @@ admin.post("/posts/:postId/translate", async (c) => {
 
       const rawSummary = (summaryResponse as { response?: string }).response?.trim();
       if (rawSummary) {
-        translatedSummary = rawSummary.length > 200 ? rawSummary.substring(0, 197) + "..." : rawSummary;
+        translatedSummary = rawSummary;
       }
     }
 

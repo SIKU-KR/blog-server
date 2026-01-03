@@ -19,8 +19,8 @@ export class TagService {
     this.repository = new TagRepository(db);
   }
 
-  async getActiveTags(): Promise<TagResponse[]> {
-    const tags = await this.repository.findAllActive();
+  async getActiveTags(locale?: string): Promise<TagResponse[]> {
+    const tags = await this.repository.findAllActive(locale);
 
     return tags.map((tag) => ({
       id: tag.id,

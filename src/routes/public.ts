@@ -162,8 +162,9 @@ publicRoutes.post("/comments/:postId", async (c) => {
 // GET /tags - List active tags
 publicRoutes.get("/tags", async (c) => {
   try {
+    const locale = c.req.query("locale") || "ko";
     const tagService = new TagService(c.env.DB);
-    const result = await tagService.getActiveTags();
+    const result = await tagService.getActiveTags(locale);
 
     return c.json({
       success: true,

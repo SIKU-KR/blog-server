@@ -71,6 +71,16 @@ export const tagQueries = {
     WHERE post_count > 0
     ORDER BY name ASC
   `,
+  selectAllActiveByLocale: `
+    SELECT t.id, t.name, t.created_at, COUNT(p.id) as post_count
+    FROM tags t
+    INNER JOIN post_tags pt ON pt.tag_id = t.id
+    INNER JOIN posts p ON p.id = pt.post_id
+    WHERE p.locale = ? AND p.state = 'published' AND p.created_at <= datetime('now')
+    GROUP BY t.id, t.name, t.created_at
+    HAVING COUNT(p.id) > 0
+    ORDER BY t.name ASC
+  `,
   selectAllPublishedSlugs: `
     SELECT slug
     FROM posts

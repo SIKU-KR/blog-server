@@ -13,7 +13,16 @@ export class TagRepository {
     this.db = db;
   }
 
-  async findAllActive(): Promise<Tag[]> {
+  async findAllActive(locale?: string): Promise<Tag[]> {
+    if (locale) {
+      // Dynamically calculate post_count for specific locale
+      const result = await this.db
+        .prepare(tagQueries.selectAllActiveByLocale)
+        .bind(locale)
+        .all<Tag>();
+      return result.results;
+    }
+    // Fallback to static post_count (all locales)
     const result = await this.db.prepare(tagQueries.selectAllActive).all<Tag>();
     return result.results;
   }
