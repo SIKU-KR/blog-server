@@ -29,7 +29,7 @@ export function validateStringLength(
   value: unknown,
   fieldName: string,
   min: number,
-  max: number
+  max?: number
 ): void {
   if (typeof value !== "string") {
     throw new ValidationError(`${fieldName} must be a string`);
@@ -41,7 +41,7 @@ export function validateStringLength(
     throw new ValidationError(`${fieldName} must be at least ${min} characters`);
   }
 
-  if (length > max) {
+  if (max !== undefined && length > max) {
     throw new ValidationError(`${fieldName} must not exceed ${max} characters`);
   }
 }
@@ -126,9 +126,9 @@ export function validateNumberRange(
 export function validatePostRequest(data: Record<string, unknown>): void {
   validateRequired(data, ["title", "content", "summary", "state"]);
 
-  validateStringLength(data.title, "title", 1, 100);
-  validateStringLength(data.content, "content", 1, 10000);
-  validateStringLength(data.summary, "summary", 1, 200);
+  validateStringLength(data.title, "title", 1);
+  validateStringLength(data.content, "content", 1);
+  validateStringLength(data.summary, "summary", 1);
   validateEnum(data.state, "state", ["published", "draft"]);
 
   if (data.slug) {
