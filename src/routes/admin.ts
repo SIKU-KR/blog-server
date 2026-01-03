@@ -371,7 +371,7 @@ ${originalPost.content}
 </korean_content>`;
     const contentResponse = await c.env.AI.run(
       "@cf/meta/llama-4-scout-17b-16e-instruct" as Parameters<typeof c.env.AI.run>[0],
-      { prompt: contentPrompt, max_tokens: 8192 }
+      { prompt: contentPrompt, max_tokens: 16384 }
     );
     const translatedContent = (contentResponse as { response: string }).response?.trim() || originalPost.content;
 
