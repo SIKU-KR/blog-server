@@ -55,6 +55,45 @@ admin.get("/posts", async (c) => {
   }
 });
 
+// GET /admin/posts/:postId - Get single post (any state)
+admin.get("/posts/:postId", async (c) => {
+  try {
+    const postIdParam = c.req.param("postId");
+    const postId = parseInt(postIdParam, 10);
+
+    if (isNaN(postId)) {
+      return c.json({ error: "Invalid post ID" }, 400);
+    }
+
+    const postRepository = new PostRepository(c.env.DB);
+    const post = await postRepository.findById(postId);
+
+    if (!post) {
+      return c.json({ error: "Post not found" }, 404);
+    }
+
+    const tags = await postRepository.getTagsByPostId(postId);
+
+    return c.json({
+      id: post.id,
+      slug: post.slug,
+      title: post.title,
+      content: post.content,
+      summary: post.summary,
+      tags,
+      state: post.state,
+      locale: post.locale,
+      originalPostId: post.original_post_id,
+      createdAt: post.created_at,
+      updatedAt: post.updated_at,
+      views: post.views,
+    });
+  } catch (error) {
+    const apiError = toAPIError(error);
+    return c.json({ error: apiError.message }, apiError.status as 400 | 401 | 500);
+  }
+});
+
 // POST /admin/posts - Create post
 admin.post("/posts", async (c) => {
   const requestId = c.get("requestId") || crypto.randomUUID();
