@@ -7,7 +7,9 @@
 export const postQueries = {
   selectById: "SELECT * FROM posts WHERE id = ?",
   selectBySlug: "SELECT id FROM posts WHERE slug = ?",
+  selectBySlugAndLocale: "SELECT id FROM posts WHERE slug = ? AND locale = ?",
   selectBySlugExcludingId: "SELECT id FROM posts WHERE slug = ? AND id != ?",
+  selectBySlugAndLocaleExcludingId: "SELECT id FROM posts WHERE slug = ? AND locale = ? AND id != ?",
   insert: `INSERT INTO posts (slug, title, content, summary, state, locale, original_post_id, created_at, updated_at, views)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
   update: `UPDATE posts

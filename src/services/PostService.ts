@@ -71,7 +71,8 @@ export class PostService {
       slug = this.generateSlug(title);
     }
 
-    const existingPost = await this.repository.findBySlug(slug);
+    // Check slug uniqueness within the same locale (allows same slug for different locales)
+    const existingPost = await this.repository.findBySlugAndLocale(slug, locale);
     if (existingPost) {
       throw new ValidationError("Slug already exists");
     }
@@ -131,8 +132,10 @@ export class PostService {
     };
 
     if (slug) {
-      const slugConflict = await this.repository.findBySlugExcludingId(
+      // Check slug uniqueness within the same locale
+      const slugConflict = await this.repository.findBySlugAndLocaleExcludingId(
         slug,
+        existingPost.locale,
         postId
       );
       if (slugConflict) {

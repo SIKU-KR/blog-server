@@ -12,14 +12,17 @@ export async function setupDatabase() {
   await db.exec(`
     CREATE TABLE IF NOT EXISTS posts (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      slug TEXT UNIQUE NOT NULL,
+      slug TEXT NOT NULL,
       title TEXT NOT NULL,
       content TEXT NOT NULL,
       summary TEXT,
       state TEXT NOT NULL DEFAULT 'draft',
+      locale TEXT NOT NULL DEFAULT 'ko',
+      original_post_id INTEGER REFERENCES posts(id) ON DELETE SET NULL,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL,
-      views INTEGER DEFAULT 0
+      views INTEGER DEFAULT 0,
+      UNIQUE(slug, locale)
     );
 
     CREATE TABLE IF NOT EXISTS tags (
@@ -66,6 +69,8 @@ export async function createTestPost(data?: Partial<{
   content: string;
   summary: string;
   state: string;
+  locale: string;
+  originalPostId: number;
 }>) {
   const db = env.DB;
   const now = new Date().toISOString();
@@ -76,14 +81,16 @@ export async function createTestPost(data?: Partial<{
     content: data?.content || "Test content",
     summary: data?.summary || "Test summary",
     state: data?.state || "published",
+    locale: data?.locale || "ko",
+    original_post_id: data?.originalPostId || null,
     created_at: now,
     updated_at: now,
   };
 
   const result = await db
     .prepare(
-      `INSERT INTO posts (slug, title, content, summary, state, created_at, updated_at, views)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 0)`
+      `INSERT INTO posts (slug, title, content, summary, state, locale, original_post_id, created_at, updated_at, views)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`
     )
     .bind(
       post.slug,
@@ -91,6 +98,8 @@ export async function createTestPost(data?: Partial<{
       post.content,
       post.summary,
       post.state,
+      post.locale,
+      post.original_post_id,
       post.created_at,
       post.updated_at
     )

@@ -46,6 +46,13 @@ export class PostRepository {
       .first<{ id: number }>();
   }
 
+  async findBySlugAndLocale(slug: string, locale: string): Promise<{ id: number } | null> {
+    return await this.db
+      .prepare(postQueries.selectBySlugAndLocale)
+      .bind(slug, locale)
+      .first<{ id: number }>();
+  }
+
   async findBySlugExcludingId(
     slug: string,
     id: number
@@ -53,6 +60,17 @@ export class PostRepository {
     return await this.db
       .prepare(postQueries.selectBySlugExcludingId)
       .bind(slug, id)
+      .first<{ id: number }>();
+  }
+
+  async findBySlugAndLocaleExcludingId(
+    slug: string,
+    locale: string,
+    id: number
+  ): Promise<{ id: number } | null> {
+    return await this.db
+      .prepare(postQueries.selectBySlugAndLocaleExcludingId)
+      .bind(slug, locale, id)
       .first<{ id: number }>();
   }
 
