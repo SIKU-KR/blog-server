@@ -78,6 +78,7 @@ export interface PostListItem {
   createdAt: string;
   updatedAt: string;
   views: number;
+  hasTranslation?: boolean;
 }
 
 export interface Tag {

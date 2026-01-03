@@ -287,6 +287,9 @@ export class PostService {
     const postIds = posts.map((p) => p.id);
     const tagsByPost = await this.repository.getTagsForPosts(postIds);
 
+    // Get translation status for Korean posts
+    const translatedPostIds = await this.repository.getTranslatedOriginalIds(postIds);
+
     const now = new Date().toISOString();
     const postsWithTags: PostListItem[] = posts.map((post) => {
       // Determine display state: if published but created_at is in future, it's "scheduled"
@@ -307,6 +310,7 @@ export class PostService {
         createdAt: post.created_at,
         updatedAt: post.updated_at,
         views: post.views,
+        hasTranslation: translatedPostIds.has(post.id),
       };
     });
 

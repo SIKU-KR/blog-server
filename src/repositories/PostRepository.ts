@@ -294,6 +294,29 @@ export class PostRepository {
   }
 
   /**
+   * Get IDs of posts that have been translated (have a translation pointing to them)
+   */
+  async getTranslatedOriginalIds(postIds: number[]): Promise<Set<number>> {
+    if (postIds.length === 0) {
+      return new Set();
+    }
+
+    const placeholders = postIds.map(() => "?").join(",");
+    const query = `
+      SELECT DISTINCT original_post_id
+      FROM posts
+      WHERE original_post_id IN (${placeholders})
+    `;
+
+    const result = await this.db
+      .prepare(query)
+      .bind(...postIds)
+      .all<{ original_post_id: number }>();
+
+    return new Set(result.results.map((r) => r.original_post_id));
+  }
+
+  /**
    * Get all posts for admin (no time filtering - includes scheduled posts)
    */
   async findAllAdmin(options: {
