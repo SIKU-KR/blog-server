@@ -317,7 +317,7 @@ ${originalPost.content}
 Translated Title:`;
 
     const aiResponse = await c.env.AI.run(
-      "@cf/meta/llama-3.3-70b-instruct-fp8" as Parameters<typeof c.env.AI.run>[0],
+      "@cf/meta/llama-4-scout-17b-16e-instruct" as Parameters<typeof c.env.AI.run>[0],
       { prompt: translatePrompt, max_tokens: 4096 }
     );
 
@@ -334,7 +334,7 @@ Translated Title:`;
       const summaryPrompt = `Translate this Korean text to English. Return only the translation, no explanations:
 ${originalPost.summary}`;
       const summaryResponse = await c.env.AI.run(
-        "@cf/meta/llama-3.3-70b-instruct-fp8" as Parameters<typeof c.env.AI.run>[0],
+        "@cf/meta/llama-4-scout-17b-16e-instruct" as Parameters<typeof c.env.AI.run>[0],
         { prompt: summaryPrompt, max_tokens: 500 }
       );
       translatedSummary = (summaryResponse as { response: string }).response.trim();
