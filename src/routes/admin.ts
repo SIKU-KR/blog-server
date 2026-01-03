@@ -379,17 +379,21 @@ ${originalPost.content}`;
     );
     const translatedContent = (contentResponse as { response: string }).response.trim();
 
-    // Translate summary if exists
+    // Translate summary if exists (must be under 200 characters)
     let translatedSummary = originalPost.summary;
     if (originalPost.summary) {
-      const summaryPrompt = `You are a professional technical translator. Translate this Korean blog summary to natural, professional English. Use standard technical terminology. Return ONLY the translation, no explanations:
+      const summaryPrompt = `You are a professional technical translator. Translate this Korean blog summary to natural, professional English. Use standard technical terminology. IMPORTANT: Keep the translation under 200 characters. Return ONLY the translation, no explanations:
 
 ${originalPost.summary}`;
       const summaryResponse = await c.env.AI.run(
         "@cf/meta/llama-4-scout-17b-16e-instruct" as Parameters<typeof c.env.AI.run>[0],
-        { prompt: summaryPrompt, max_tokens: 500 }
+        { prompt: summaryPrompt, max_tokens: 100 }
       );
       translatedSummary = (summaryResponse as { response: string }).response.trim();
+      // Ensure summary doesn't exceed 200 characters
+      if (translatedSummary.length > 200) {
+        translatedSummary = translatedSummary.substring(0, 197) + "...";
+      }
     }
 
     // Create the translated post as draft (keep original slug and createdAt)
