@@ -378,12 +378,12 @@ ${originalPost.content}
     // Translate summary
     let translatedSummary = originalPost.summary;
     if (originalPost.summary) {
-      const summaryPrompt = `You are a professional technical translator. Translate this Korean blog summary to natural, professional English. Use standard technical terminology. IMPORTANT: Keep the translation under 200 characters. Return ONLY the translation, no explanations:
+      const summaryPrompt = `Translate this Korean text to English. Keep it under 200 characters. Return ONLY the translation:
 
-${originalPost.summary}`;
+<korean>${originalPost.summary}</korean>`;
       const summaryResponse = await c.env.AI.run(
         "@cf/meta/llama-4-scout-17b-16e-instruct" as Parameters<typeof c.env.AI.run>[0],
-        { prompt: summaryPrompt, max_tokens: 100 }
+        { prompt: summaryPrompt, max_tokens: 256 }
       );
       translatedSummary = (summaryResponse as { response: string }).response?.trim() || originalPost.summary;
       if (translatedSummary.length > 200) {
