@@ -342,52 +342,63 @@ admin.post("/posts/:postId/translate", async (c) => {
       throw new ValidationError("Translation already exists");
     }
 
-    // Translate title
-    const titlePrompt = `You are a professional technical translator. Translate this Korean blog title to natural, professional English. Use standard technical terminology. Return ONLY the translated title, no explanations or quotes:
+    const AI_MODEL = "@cf/meta/llama-4-scout-17b-16e-instruct" as Parameters<typeof c.env.AI.run>[0];
 
-${originalPost.title}`;
-    const titleResponse = await c.env.AI.run(
-      "@cf/meta/llama-4-scout-17b-16e-instruct" as Parameters<typeof c.env.AI.run>[0],
-      { prompt: titlePrompt, max_tokens: 200 }
-    );
-    const translatedTitle = (titleResponse as { response: string }).response?.trim() || originalPost.title;
+    // Translate title using messages format
+    logger.info("Translating title", { original: originalPost.title });
 
-    // Translate content
-    const contentPrompt = `You are a professional technical translator specializing in Korean to English translation for technical blog posts.
+    const titleResponse = await c.env.AI.run(AI_MODEL, {
+      messages: [
+        { role: "system", content: "You are a Korean to English translator. Output only the translation, nothing else." },
+        { role: "user", content: originalPost.title }
+      ],
+      max_tokens: 200,
+    });
 
-Translate the Korean Markdown content inside <korean_content> tags to natural, professional English.
+    const translatedTitle = (titleResponse as { response?: string }).response?.trim();
+    logger.info("Title response", { translated: translatedTitle });
 
-Rules:
-- Preserve all Markdown formatting (headers, lists, bold, code blocks, etc.)
-- Do NOT modify image links ![...](...) or URLs [...](...)
-- Translate Korean comments inside code blocks to English
-- Use standard technical terminology
-- Make it natural for English speakers
+    if (!translatedTitle) {
+      throw new ValidationError("AI failed to translate title");
+    }
 
-Return ONLY the translated content without any tags or explanations.
+    // Translate content using messages format
+    logger.info("Translating content", { length: originalPost.content.length });
 
-<korean_content>
-${originalPost.content}
-</korean_content>`;
-    const contentResponse = await c.env.AI.run(
-      "@cf/meta/llama-4-scout-17b-16e-instruct" as Parameters<typeof c.env.AI.run>[0],
-      { prompt: contentPrompt, max_tokens: 16384 }
-    );
-    const translatedContent = (contentResponse as { response: string }).response?.trim() || originalPost.content;
+    const contentResponse = await c.env.AI.run(AI_MODEL, {
+      messages: [
+        {
+          role: "system",
+          content: "You are a Korean to English translator for technical blog posts. Translate the Markdown content. Preserve all Markdown formatting, URLs, image paths, and code blocks. Only translate Korean text to English."
+        },
+        { role: "user", content: originalPost.content }
+      ],
+      max_tokens: 16384,
+    });
+
+    const translatedContent = (contentResponse as { response?: string }).response?.trim();
+    logger.info("Content response", { length: translatedContent?.length });
+
+    if (!translatedContent) {
+      throw new ValidationError("AI failed to translate content");
+    }
 
     // Translate summary
     let translatedSummary = originalPost.summary;
     if (originalPost.summary) {
-      const summaryPrompt = `Translate this Korean text to English. Keep it under 200 characters. Return ONLY the translation:
+      logger.info("Translating summary");
 
-<korean>${originalPost.summary}</korean>`;
-      const summaryResponse = await c.env.AI.run(
-        "@cf/meta/llama-4-scout-17b-16e-instruct" as Parameters<typeof c.env.AI.run>[0],
-        { prompt: summaryPrompt, max_tokens: 256 }
-      );
-      translatedSummary = (summaryResponse as { response: string }).response?.trim() || originalPost.summary;
-      if (translatedSummary.length > 200) {
-        translatedSummary = translatedSummary.substring(0, 197) + "...";
+      const summaryResponse = await c.env.AI.run(AI_MODEL, {
+        messages: [
+          { role: "system", content: "Translate Korean to English. Max 200 characters. Output only the translation." },
+          { role: "user", content: originalPost.summary }
+        ],
+        max_tokens: 256,
+      });
+
+      const rawSummary = (summaryResponse as { response?: string }).response?.trim();
+      if (rawSummary) {
+        translatedSummary = rawSummary.length > 200 ? rawSummary.substring(0, 197) + "..." : rawSummary;
       }
     }
 
@@ -405,7 +416,13 @@ ${originalPost.content}
       createdAt: originalPost.created_at,
     }, logger);
 
-    logger.info("Post translated", { originalPostId: postId, translatedPostId: translatedPost.id, targetLocale });
+    logger.info("Post translated successfully", {
+      originalPostId: postId,
+      translatedPostId: translatedPost.id,
+      targetLocale,
+      titleChanged: translatedTitle !== originalPost.title,
+      contentLengthRatio: (translatedContent.length / originalPost.content.length).toFixed(2),
+    });
 
     return c.json({
       success: true,
@@ -413,6 +430,10 @@ ${originalPost.content}
       translatedPost,
     }, 200);
   } catch (error) {
+    logger.error("Translation failed", {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    });
     const apiError = toAPIError(error);
     return c.json({ error: apiError.message }, apiError.status as 400 | 404 | 500);
   }
