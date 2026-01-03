@@ -12,6 +12,8 @@ interface PostCreateData {
   content: string;
   summary: string | null;
   state: string;
+  locale: string;
+  originalPostId: number | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -22,6 +24,7 @@ interface PostUpdateData {
   summary: string | null;
   state: string;
   slug: string | null;
+  createdAt?: string | null;
   updatedAt: string;
 }
 
@@ -54,23 +57,23 @@ export class PostRepository {
   }
 
   async create(postData: PostCreateData): Promise<number> {
-    const { slug, title, content, summary, state, createdAt, updatedAt } =
+    const { slug, title, content, summary, state, locale, originalPostId, createdAt, updatedAt } =
       postData;
 
     const result = await this.db
       .prepare(postQueries.insert)
-      .bind(slug, title, content, summary, state, createdAt, updatedAt)
+      .bind(slug, title, content, summary, state, locale, originalPostId, createdAt, updatedAt)
       .run();
 
     return result.meta.last_row_id as number;
   }
 
   async update(id: number, postData: PostUpdateData): Promise<void> {
-    const { title, content, summary, state, slug, updatedAt } = postData;
+    const { title, content, summary, state, slug, createdAt, updatedAt } = postData;
 
     await this.db
       .prepare(postQueries.update)
-      .bind(title, content, summary, state, slug, updatedAt, id)
+      .bind(title, content, summary, state, slug, createdAt ?? null, updatedAt, id)
       .run();
   }
 
@@ -128,20 +131,23 @@ export class PostRepository {
 
   async findAll(options: {
     tag?: string | null;
+    locale?: string;
     offset?: number;
     limit?: number;
     orderClause?: string;
   }): Promise<Post[]> {
-    const { tag = null, offset = 0, limit = 10, orderClause = "created_at DESC" } = options;
+    const { tag = null, locale = "ko", offset = 0, limit = 10, orderClause = "created_at DESC" } = options;
 
     let query: string;
     let bindings: (string | number)[];
 
     if (tag) {
       query = `
-        SELECT p.id, p.slug, p.title, p.summary, p.created_at, p.updated_at, p.views
+        SELECT p.id, p.slug, p.title, p.summary, p.locale, p.original_post_id, p.created_at, p.updated_at, p.views
         FROM posts p
         WHERE p.state = 'published'
+          AND p.locale = ?
+          AND p.created_at <= datetime('now')
           AND p.id IN (
             SELECT DISTINCT pt.post_id
             FROM post_tags pt
@@ -151,16 +157,16 @@ export class PostRepository {
         ORDER BY ${orderClause}
         LIMIT ? OFFSET ?
       `;
-      bindings = [tag, limit, offset];
+      bindings = [locale, tag, limit, offset];
     } else {
       query = `
-        SELECT id, slug, title, summary, created_at, updated_at, views
+        SELECT id, slug, title, summary, locale, original_post_id, created_at, updated_at, views
         FROM posts
-        WHERE state = 'published'
+        WHERE state = 'published' AND locale = ? AND created_at <= datetime('now')
         ORDER BY ${orderClause}
         LIMIT ? OFFSET ?
       `;
-      bindings = [limit, offset];
+      bindings = [locale, limit, offset];
     }
 
     const result = await this.db
@@ -171,7 +177,7 @@ export class PostRepository {
     return result.results;
   }
 
-  async count(tag: string | null = null): Promise<number> {
+  async count(tag: string | null = null, locale: string = "ko"): Promise<number> {
     let query: string;
     let bindings: string[];
 
@@ -181,16 +187,16 @@ export class PostRepository {
         FROM posts p
         INNER JOIN post_tags pt ON p.id = pt.post_id
         INNER JOIN tags t ON pt.tag_id = t.id
-        WHERE t.name = ? AND p.state = 'published'
+        WHERE t.name = ? AND p.locale = ? AND p.state = 'published' AND p.created_at <= datetime('now')
       `;
-      bindings = [tag];
+      bindings = [tag, locale];
     } else {
       query = `
         SELECT COUNT(*) as total
         FROM posts
-        WHERE state = 'published'
+        WHERE state = 'published' AND locale = ? AND created_at <= datetime('now')
       `;
-      bindings = [];
+      bindings = [locale];
     }
 
     const result = await this.db
@@ -202,13 +208,25 @@ export class PostRepository {
   }
 
   async incrementViews(id: number): Promise<void> {
-    await this.db.prepare(postQueries.incrementViews).bind(id).run();
+    // Get the post to check if it's a translation
+    const post = await this.findById(id);
+    if (!post) return;
+
+    // If this is a translation, increment the original post's views
+    const targetId = post.original_post_id || id;
+    await this.db.prepare(postQueries.incrementViews).bind(targetId).run();
   }
 
   async getViews(id: number): Promise<number | null> {
+    // Get the post to check if it's a translation
+    const post = await this.findById(id);
+    if (!post) return null;
+
+    // If this is a translation, get the original post's views
+    const targetId = post.original_post_id || id;
     const result = await this.db
       .prepare(postQueries.selectViews)
-      .bind(id)
+      .bind(targetId)
       .first<{ views: number }>();
 
     return result?.views ?? null;
@@ -255,6 +273,82 @@ export class PostRepository {
     }
 
     return tagsByPost;
+  }
+
+  /**
+   * Get all posts for admin (no time filtering - includes scheduled posts)
+   */
+  async findAllAdmin(options: {
+    locale?: string;
+    offset?: number;
+    limit?: number;
+    orderClause?: string;
+  }): Promise<Post[]> {
+    const { locale, offset = 0, limit = 10, orderClause = "created_at DESC" } = options;
+
+    let query: string;
+    let bindings: (string | number)[];
+
+    if (locale) {
+      query = `
+        SELECT id, slug, title, summary, state, locale, original_post_id, created_at, updated_at, views
+        FROM posts
+        WHERE locale = ?
+        ORDER BY ${orderClause}
+        LIMIT ? OFFSET ?
+      `;
+      bindings = [locale, limit, offset];
+    } else {
+      query = `
+        SELECT id, slug, title, summary, state, locale, original_post_id, created_at, updated_at, views
+        FROM posts
+        ORDER BY ${orderClause}
+        LIMIT ? OFFSET ?
+      `;
+      bindings = [limit, offset];
+    }
+
+    const result = await this.db
+      .prepare(query)
+      .bind(...bindings)
+      .all<Post>();
+
+    return result.results;
+  }
+
+  /**
+   * Count all posts for admin (no time filtering)
+   */
+  async countAdmin(locale?: string): Promise<number> {
+    if (locale) {
+      const query = `SELECT COUNT(*) as total FROM posts WHERE locale = ?`;
+      const result = await this.db.prepare(query).bind(locale).first<{ total: number }>();
+      return result?.total ?? 0;
+    }
+    const query = `SELECT COUNT(*) as total FROM posts`;
+    const result = await this.db.prepare(query).first<{ total: number }>();
+    return result?.total ?? 0;
+  }
+
+  /**
+   * Find translation of a post
+   */
+  async findTranslation(originalPostId: number, locale: string): Promise<{ id: number; slug: string; locale: string } | null> {
+    return await this.db
+      .prepare(postQueries.selectTranslation)
+      .bind(originalPostId, locale)
+      .first<{ id: number; slug: string; locale: string }>();
+  }
+
+  /**
+   * Get all language versions of a post (original + translations)
+   */
+  async findAllLanguageVersions(postId: number): Promise<{ id: number; slug: string; locale: string }[]> {
+    const result = await this.db
+      .prepare(postQueries.selectOriginalAndTranslations)
+      .bind(postId, postId)
+      .all<{ id: number; slug: string; locale: string }>();
+    return result.results;
   }
 
   /**

@@ -52,12 +52,18 @@ export class PostService {
       summary,
       tags = [],
       state,
+      locale = "ko",
+      originalPostId = null,
+      createdAt: requestedCreatedAt,
     } = postData as {
       title: string;
       content: string;
       summary: string;
       tags?: string[];
       state: string;
+      locale?: string;
+      originalPostId?: number | null;
+      createdAt?: string;
     };
     let slug = postData.slug as string | undefined;
 
@@ -71,13 +77,16 @@ export class PostService {
     }
 
     const now = new Date().toISOString();
+    const createdAt = requestedCreatedAt || now;
     const postId = await this.repository.create({
       slug,
       title,
       content,
       summary,
       state,
-      createdAt: now,
+      locale,
+      originalPostId,
+      createdAt,
       updatedAt: now,
     });
 
@@ -93,7 +102,7 @@ export class PostService {
     }
 
     if (logger) {
-      logger.info("Post created", { postId, slug });
+      logger.info("Post created", { postId, slug, locale });
     }
 
     return createdPost!;
@@ -111,13 +120,14 @@ export class PostService {
       throw new NotFoundError("Post not found");
     }
 
-    const { title, content, summary, tags = [], state, slug } = postData as {
+    const { title, content, summary, tags = [], state, slug, createdAt } = postData as {
       title: string;
       content: string;
       summary: string;
       tags?: string[];
       state: string;
       slug?: string;
+      createdAt?: string;
     };
 
     if (slug) {
@@ -137,6 +147,7 @@ export class PostService {
       summary,
       state,
       slug: slug || null,
+      createdAt: createdAt || null,
       updatedAt: now,
     });
 
@@ -223,20 +234,22 @@ export class PostService {
       summary: post.summary,
       tags,
       state: post.state,
+      locale: post.locale,
+      originalPostId: post.original_post_id,
       createdAt: post.created_at,
       updatedAt: post.updated_at,
       views: post.views,
     };
   }
 
-  // Public API methods
-  async getPosts(options: {
-    tag?: string | null;
+  // Admin API methods
+  async getAdminPosts(options: {
+    locale?: string;
     page?: number;
     size?: number;
     sort?: string;
   }): Promise<PaginatedResponse<PostListItem>> {
-    const { tag = null, page = 0, size = 10, sort = "createdAt,desc" } = options;
+    const { locale, page = 0, size = 10, sort = "createdAt,desc" } = options;
 
     const paginationErrors = validatePagination({ page, size });
     if (paginationErrors.length > 0) {
@@ -264,8 +277,82 @@ export class PostService {
     const offset = page * size;
 
     const [posts, totalElements] = await Promise.all([
-      this.repository.findAll({ tag, offset, limit: size, orderClause }),
-      this.repository.count(tag),
+      this.repository.findAllAdmin({ locale, offset, limit: size, orderClause }),
+      this.repository.countAdmin(locale),
+    ]);
+
+    const postIds = posts.map((p) => p.id);
+    const tagsByPost = await this.repository.getTagsForPosts(postIds);
+
+    const now = new Date().toISOString();
+    const postsWithTags: PostListItem[] = posts.map((post) => {
+      // Determine display state: if published but created_at is in future, it's "scheduled"
+      let displayState: "draft" | "published" | "scheduled" = post.state;
+      if (post.state === "published" && post.created_at > now) {
+        displayState = "scheduled";
+      }
+
+      return {
+        id: post.id,
+        slug: post.slug,
+        title: post.title,
+        summary: post.summary,
+        tags: tagsByPost.get(post.id) || [],
+        state: displayState,
+        locale: post.locale,
+        originalPostId: post.original_post_id,
+        createdAt: post.created_at,
+        updatedAt: post.updated_at,
+        views: post.views,
+      };
+    });
+
+    return {
+      content: postsWithTags,
+      totalElements,
+      pageNumber: page,
+      pageSize: size,
+    };
+  }
+
+  // Public API methods
+  async getPosts(options: {
+    tag?: string | null;
+    locale?: string;
+    page?: number;
+    size?: number;
+    sort?: string;
+  }): Promise<PaginatedResponse<PostListItem>> {
+    const { tag = null, locale = "ko", page = 0, size = 10, sort = "createdAt,desc" } = options;
+
+    const paginationErrors = validatePagination({ page, size });
+    if (paginationErrors.length > 0) {
+      throw new ValidationError(paginationErrors.join(", "));
+    }
+
+    const allowedSortFields = ["createdAt", "updatedAt", "views", "title"];
+    const sortErrors = validateSorting(sort, allowedSortFields);
+    if (sortErrors.length > 0) {
+      throw new ValidationError(sortErrors.join(", "));
+    }
+
+    const [sortField, sortDirection] = sort.split(",");
+
+    const fieldMapping: Record<string, string> = {
+      createdAt: "created_at",
+      updatedAt: "updated_at",
+      views: "views",
+      title: "title",
+    };
+
+    const dbSortField = fieldMapping[sortField] || sortField;
+    const orderClause = `${dbSortField} ${sortDirection.toUpperCase()}`;
+
+    const offset = page * size;
+
+    const [posts, totalElements] = await Promise.all([
+      this.repository.findAll({ tag, locale, offset, limit: size, orderClause }),
+      this.repository.count(tag, locale),
     ]);
 
     const postIds = posts.map((p) => p.id);
@@ -277,6 +364,9 @@ export class PostService {
       title: post.title,
       summary: post.summary,
       tags: tagsByPost.get(post.id) || [],
+      state: post.state,
+      locale: post.locale,
+      originalPostId: post.original_post_id,
       createdAt: post.created_at,
       updatedAt: post.updated_at,
       views: post.views,
@@ -291,9 +381,10 @@ export class PostService {
   }
 
   async getPostBySlug(
-    slug: string
+    slug: string,
+    locale?: string
   ): Promise<
-    { redirect: true; slug: string } | { redirect: false; data: PostWithTags }
+    { redirect: true; slug: string; locale?: string } | { redirect: false; data: PostWithTags & { availableLocales: { locale: string; slug: string }[] } }
   > {
     if (!slug) {
       throw new ValidationError("Slug parameter is required");
@@ -311,6 +402,7 @@ export class PostService {
       return {
         redirect: true,
         slug: post.slug,
+        locale: post.locale,
       };
     }
 
@@ -320,7 +412,29 @@ export class PostService {
       throw new NotFoundError("Post not found");
     }
 
+    // If locale is specified and doesn't match, try to find the translation
+    if (locale && post.locale !== locale) {
+      // Find if there's a version in the requested locale
+      const originalId = post.original_post_id || post.id;
+      const translation = await this.repository.findTranslation(originalId, locale);
+      if (translation) {
+        return {
+          redirect: true,
+          slug: translation.slug,
+          locale: translation.locale,
+        };
+      }
+    }
+
     const tags = await this.repository.getTagsForPost(post.id);
+
+    // Get all available language versions
+    const originalId = post.original_post_id || post.id;
+    const allVersions = await this.repository.findAllLanguageVersions(originalId);
+    const availableLocales = allVersions.map(v => ({ locale: v.locale, slug: v.slug }));
+
+    // Get views from original post (unified view count)
+    const unifiedViews = await this.repository.getViews(post.id) ?? post.views;
 
     return {
       redirect: false,
@@ -332,9 +446,12 @@ export class PostService {
         summary: post.summary,
         tags,
         state: post.state,
+        locale: post.locale,
+        originalPostId: post.original_post_id,
         createdAt: post.created_at,
         updatedAt: post.updated_at,
-        views: post.views,
+        views: unifiedViews,
+        availableLocales,
       },
     };
   }

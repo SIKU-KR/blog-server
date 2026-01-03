@@ -58,4 +58,19 @@ export class CommentRepository {
 
     return result !== null;
   }
+
+  /**
+   * Get the original post ID for unified comments
+   * If the post has original_post_id, return that; otherwise return the post's own ID
+   */
+  async getOriginalPostId(postId: number): Promise<number | null> {
+    const result = await this.db
+      .prepare("SELECT id, original_post_id FROM posts WHERE id = ?")
+      .bind(postId)
+      .first<{ id: number; original_post_id: number | null }>();
+
+    if (!result) return null;
+
+    return result.original_post_id || result.id;
+  }
 }

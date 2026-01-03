@@ -8,30 +8,45 @@ export const postQueries = {
   selectById: "SELECT * FROM posts WHERE id = ?",
   selectBySlug: "SELECT id FROM posts WHERE slug = ?",
   selectBySlugExcludingId: "SELECT id FROM posts WHERE slug = ? AND id != ?",
-  insert: `INSERT INTO posts (slug, title, content, summary, state, created_at, updated_at, views)
-           VALUES (?, ?, ?, ?, ?, ?, ?, 0)`,
+  insert: `INSERT INTO posts (slug, title, content, summary, state, locale, original_post_id, created_at, updated_at, views)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
   update: `UPDATE posts
-           SET title = ?, content = ?, summary = ?, state = ?, slug = COALESCE(?, slug), updated_at = ?
+           SET title = ?, content = ?, summary = ?, state = ?, slug = COALESCE(?, slug),
+               created_at = COALESCE(?, created_at), updated_at = ?
            WHERE id = ?`,
   delete: "DELETE FROM posts WHERE id = ?",
 
-  // Public queries
+  // Public queries - only show posts where created_at <= now (scheduled posts hidden)
   selectPublishedBySlug: `
-    SELECT id, slug, title, content, summary, state, created_at, updated_at, views
+    SELECT id, slug, title, content, summary, state, locale, original_post_id, created_at, updated_at, views
     FROM posts
-    WHERE slug = ? AND state = 'published'
+    WHERE slug = ? AND state = 'published' AND created_at <= datetime('now')
+  `,
+  selectPublishedBySlugAndLocale: `
+    SELECT id, slug, title, content, summary, state, locale, original_post_id, created_at, updated_at, views
+    FROM posts
+    WHERE slug = ? AND locale = ? AND state = 'published' AND created_at <= datetime('now')
   `,
   selectPublishedById: `
-    SELECT id, slug, title, content, summary, state, created_at, updated_at, views
+    SELECT id, slug, title, content, summary, state, locale, original_post_id, created_at, updated_at, views
     FROM posts
-    WHERE id = ? AND state = 'published'
+    WHERE id = ? AND state = 'published' AND created_at <= datetime('now')
   `,
   incrementViews: `
     UPDATE posts
     SET views = views + 1
-    WHERE id = ? AND state = 'published'
+    WHERE id = ? AND state = 'published' AND created_at <= datetime('now')
   `,
   selectViews: "SELECT views FROM posts WHERE id = ?",
+  // Find translation of a post
+  selectTranslation: `
+    SELECT id, slug, locale FROM posts
+    WHERE original_post_id = ? AND locale = ?
+  `,
+  selectOriginalAndTranslations: `
+    SELECT id, slug, locale FROM posts
+    WHERE id = ? OR original_post_id = ?
+  `,
 };
 
 // Post tag queries
@@ -57,7 +72,7 @@ export const tagQueries = {
   selectAllPublishedSlugs: `
     SELECT slug
     FROM posts
-    WHERE state = 'published'
+    WHERE state = 'published' AND created_at <= datetime('now')
     ORDER BY created_at DESC
   `,
 };
@@ -77,6 +92,6 @@ export const commentQueries = {
     VALUES (?, ?, ?, ?, ?)
   `,
   checkPostExists: `
-    SELECT id FROM posts WHERE id = ? AND state = 'published'
+    SELECT id FROM posts WHERE id = ? AND state = 'published' AND created_at <= datetime('now')
   `,
 };

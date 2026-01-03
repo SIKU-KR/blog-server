@@ -153,8 +153,15 @@ export class EmbeddingService {
         returnMetadata: "all",
       });
 
+      const now = new Date().toISOString();
       const relatedPosts: RelatedPost[] = results.matches
-        .filter((match) => match.id !== vectorId) // Exclude self
+        .filter((match) => {
+          if (match.id === vectorId) return false; // Exclude self
+          const metadata = match.metadata as unknown as PostVectorMetadata;
+          // Exclude unpublished or scheduled posts (publishedAt > now)
+          if (metadata.publishedAt && metadata.publishedAt > now) return false;
+          return true;
+        })
         .slice(0, topK)
         .map((match) => {
           const metadata = match.metadata as unknown as PostVectorMetadata;

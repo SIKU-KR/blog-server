@@ -2,6 +2,7 @@
  * Admin Routes
  * All routes require JWT authentication
  *
+ * GET /admin/posts - List all posts (including scheduled)
  * POST /admin/posts - Create post
  * PUT /admin/posts/:postId - Update post
  * DELETE /admin/posts/:postId - Delete post
@@ -31,6 +32,28 @@ const admin = new Hono<{ Bindings: Env }>();
 
 // Apply auth middleware to all admin routes
 admin.use("/*", authMiddleware);
+
+// GET /admin/posts - List all posts (including scheduled)
+admin.get("/posts", async (c) => {
+  const requestId = c.get("requestId") || crypto.randomUUID();
+  const logger = createLogger(requestId);
+
+  try {
+    const locale = c.req.query("locale") || undefined;
+    const page = parseInt(c.req.query("page") || "0", 10);
+    const size = parseInt(c.req.query("size") || "10", 10);
+    const sort = c.req.query("sort") || "createdAt,desc";
+
+    const postService = new PostService(c.env.DB);
+    const result = await postService.getAdminPosts({ locale, page, size, sort });
+
+    logger.info("Admin posts listed", { locale, page, size, total: result.totalElements });
+    return c.json(result, 200);
+  } catch (error) {
+    const apiError = toAPIError(error);
+    return c.json({ error: apiError.message }, apiError.status as 400 | 500);
+  }
+});
 
 // POST /admin/posts - Create post
 admin.post("/posts", async (c) => {
@@ -239,6 +262,113 @@ admin.post("/ai/slug", async (c) => {
   } catch (error) {
     const apiError = toAPIError(error);
     return c.json({ error: apiError.message }, apiError.status as 400 | 500);
+  }
+});
+
+// POST /admin/posts/:postId/translate - Translate post to target locale using AI
+admin.post("/posts/:postId/translate", async (c) => {
+  const requestId = c.get("requestId") || crypto.randomUUID();
+  const logger = createLogger(requestId);
+
+  try {
+    const postIdParam = c.req.param("postId");
+    const postId = parseInt(postIdParam, 10);
+
+    if (isNaN(postId)) {
+      throw new ValidationError("Invalid post ID");
+    }
+
+    const body = await c.req.json<{ targetLocale: string }>();
+    const targetLocale = body.targetLocale || "en";
+
+    if (targetLocale !== "en") {
+      throw new ValidationError("Only English translation is supported");
+    }
+
+    // Get the original post
+    const postRepository = new PostRepository(c.env.DB);
+    const originalPost = await postRepository.findById(postId);
+
+    if (!originalPost) {
+      throw new ValidationError("Post not found");
+    }
+
+    if (originalPost.locale !== "ko") {
+      throw new ValidationError("Only Korean posts can be translated");
+    }
+
+    // Check if translation already exists
+    const existingTranslation = await postRepository.findTranslation(postId, targetLocale);
+    if (existingTranslation) {
+      throw new ValidationError("Translation already exists");
+    }
+
+    // Translate using Cloudflare AI
+    const translatePrompt = `You are a professional translator. Translate the following Korean blog post to English.
+Keep the markdown formatting intact. Only translate the text content.
+Do not add any explanations or notes. Return only the translated content.
+
+Title: ${originalPost.title}
+
+Content:
+${originalPost.content}
+
+---
+Translated Title:`;
+
+    const aiResponse = await c.env.AI.run(
+      "@cf/meta/llama-3.3-70b-instruct-fp8" as Parameters<typeof c.env.AI.run>[0],
+      { prompt: translatePrompt, max_tokens: 4096 }
+    );
+
+    const translatedText = (aiResponse as { response: string }).response;
+
+    // Parse translated title and content
+    const lines = translatedText.trim().split("\n");
+    const translatedTitle = lines[0].replace(/^#*\s*/, "").trim();
+    const translatedContent = lines.slice(1).join("\n").trim();
+
+    // Translate summary if exists
+    let translatedSummary = originalPost.summary;
+    if (originalPost.summary) {
+      const summaryPrompt = `Translate this Korean text to English. Return only the translation, no explanations:
+${originalPost.summary}`;
+      const summaryResponse = await c.env.AI.run(
+        "@cf/meta/llama-3.3-70b-instruct-fp8" as Parameters<typeof c.env.AI.run>[0],
+        { prompt: summaryPrompt, max_tokens: 500 }
+      );
+      translatedSummary = (summaryResponse as { response: string }).response.trim();
+    }
+
+    // Generate English slug
+    const englishSlug = translatedTitle
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "");
+
+    // Create the translated post as draft
+    const postService = new PostService(c.env.DB, c.env.VECTORIZE, c.env.AI);
+    const translatedPost = await postService.createPost({
+      title: translatedTitle,
+      content: translatedContent,
+      summary: translatedSummary,
+      slug: englishSlug,
+      tags: await postRepository.getTagsByPostId(postId),
+      state: "draft",
+      locale: targetLocale,
+      originalPostId: postId,
+    }, logger);
+
+    logger.info("Post translated", { originalPostId: postId, translatedPostId: translatedPost.id, targetLocale });
+
+    return c.json({
+      success: true,
+      originalPostId: postId,
+      translatedPost,
+    }, 200);
+  } catch (error) {
+    const apiError = toAPIError(error);
+    return c.json({ error: apiError.message }, apiError.status as 400 | 404 | 500);
   }
 });
 

@@ -27,12 +27,13 @@ const publicRoutes = new Hono<{ Bindings: Env }>();
 publicRoutes.get("/posts", async (c) => {
   try {
     const tag = c.req.query("tag") || null;
+    const locale = c.req.query("locale") || "ko";
     const page = parseInt(c.req.query("page") || "0", 10);
     const size = parseInt(c.req.query("size") || "10", 10);
     const sort = c.req.query("sort") || "createdAt,desc";
 
     const postService = new PostService(c.env.DB);
-    const result = await postService.getPosts({ tag, page, size, sort });
+    const result = await postService.getPosts({ tag, locale, page, size, sort });
 
     return c.json({
       success: true,

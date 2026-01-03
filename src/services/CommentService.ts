@@ -46,7 +46,7 @@ export class CommentService {
     return { deleted: true, id: commentId };
   }
 
-  // Public: Get comments for a post
+  // Public: Get comments for a post (unified across translations)
   async getCommentsByPostId(postId: string | number): Promise<CommentResponse[]> {
     if (!postId) {
       throw new ValidationError("Post ID is required");
@@ -62,7 +62,14 @@ export class CommentService {
       throw new NotFoundError("Post not found");
     }
 
-    const comments = await this.repository.findByPostId(id);
+    // Get original post ID for unified comments
+    const originalId = await this.repository.getOriginalPostId(id);
+    if (!originalId) {
+      throw new NotFoundError("Post not found");
+    }
+
+    // Fetch comments from the original post
+    const comments = await this.repository.findByPostId(originalId);
 
     return comments.map((comment) => ({
       id: comment.id,
@@ -73,7 +80,7 @@ export class CommentService {
     }));
   }
 
-  // Public: Create comment
+  // Public: Create comment (always on original post for unified comments)
   async createComment(
     postId: string | number,
     commentData: { content?: string; author?: string }
@@ -92,6 +99,12 @@ export class CommentService {
       throw new NotFoundError("Post not found");
     }
 
+    // Get original post ID to store comment there
+    const originalId = await this.repository.getOriginalPostId(id);
+    if (!originalId) {
+      throw new NotFoundError("Post not found");
+    }
+
     const errors = validateCreateComment(commentData);
     if (errors.length > 0) {
       throw new ValidationError(errors.join(", "));
@@ -105,7 +118,7 @@ export class CommentService {
       content: commentData.content!,
       authorName: commentData.author!,
       createdAt: now,
-      postId: id,
+      postId: originalId, // Always store on original post
     });
 
     return {
@@ -113,7 +126,7 @@ export class CommentService {
       content: commentData.content!,
       authorName: commentData.author!,
       createdAt: now,
-      postId: id,
+      postId: originalId,
     };
   }
 }

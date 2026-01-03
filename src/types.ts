@@ -35,6 +35,8 @@ export interface JWTPayload {
   exp: number;
 }
 
+export type Locale = "ko" | "en";
+
 export interface Post {
   id: number;
   slug: string;
@@ -42,6 +44,8 @@ export interface Post {
   content: string;
   summary: string | null;
   state: "draft" | "published";
+  locale: Locale;
+  original_post_id: number | null;
   created_at: string;
   updated_at: string;
   views: number;
@@ -55,6 +59,8 @@ export interface PostWithTags {
   summary: string | null;
   tags: string[];
   state: "draft" | "published";
+  locale: Locale;
+  originalPostId: number | null;
   createdAt: string;
   updatedAt: string;
   views: number;
@@ -66,6 +72,9 @@ export interface PostListItem {
   title: string;
   summary: string | null;
   tags: string[];
+  state: "draft" | "published" | "scheduled";
+  locale: Locale;
+  originalPostId: number | null;
   createdAt: string;
   updatedAt: string;
   views: number;
@@ -93,6 +102,8 @@ export interface CreatePostRequest {
   slug?: string;
   tags?: string[];
   state: "draft" | "published";
+  locale?: Locale;
+  originalPostId?: number;
 }
 
 export interface CreateCommentRequest {
