@@ -343,34 +343,51 @@ admin.post("/posts/:postId/translate", async (c) => {
     }
 
     // Translate title
+    const titlePrompt = `You are a professional technical translator. Translate this Korean blog title to natural, professional English. Use standard technical terminology. Return ONLY the translated title, no explanations or quotes:
+
+${originalPost.title}`;
     const titleResponse = await c.env.AI.run(
       "@cf/meta/llama-4-scout-17b-16e-instruct" as Parameters<typeof c.env.AI.run>[0],
-      {
-        prompt: `Translate to English. Return ONLY the translation:\n\n${originalPost.title}`,
-        max_tokens: 200,
-      }
+      { prompt: titlePrompt, max_tokens: 200 }
     );
     const translatedTitle = (titleResponse as { response: string }).response?.trim() || originalPost.title;
 
     // Translate content
+    const contentPrompt = `# Role
+You are a professional technical translator and content editor specialized in localizing Korean blog posts for a global English-speaking audience.
+
+# Task
+Translate the provided Korean Markdown content into natural, high-quality English.
+Your translation must be contextually accurate and maintain a professional yet engaging tone.
+
+# Strict Constraints
+1. **Preserve Markdown Syntax**: Do not alter any Markdown formatting, including headers (##), lists (-, 1.), bolding (**), tables, and blockquotes (>).
+2. **Non-Translatable Elements**:
+    - **Images & Links**: Absolutely do NOT translate or modify the contents inside \`![]()\` and \`[]()\`. Keep the URLs and alternative text paths exactly as they are in the original.
+    - **Code Blocks**: Do not change the code inside triple backticks (\`\`\`). However, if there are comments inside the code written in Korean, translate them into English.
+3. **Technical Terminology**: Use standard industry terms (e.g., use "Refactoring" instead of a literal translation of "코드 개선"). Keep widely used English technical terms as they are.
+4. **Natural Localization**: Avoid literal word-for-word translation. Ensure the flow is natural for native English speakers while keeping the original intent.
+
+# Output Format
+Return ONLY the translated content. Do not add any explanations, notes, or markers.
+
+# Input Content
+${originalPost.content}`;
     const contentResponse = await c.env.AI.run(
       "@cf/meta/llama-4-scout-17b-16e-instruct" as Parameters<typeof c.env.AI.run>[0],
-      {
-        prompt: `Translate to English. Keep markdown formatting. Do not translate code blocks or image URLs:\n\n${originalPost.content}`,
-        max_tokens: 8192,
-      }
+      { prompt: contentPrompt, max_tokens: 8192 }
     );
     const translatedContent = (contentResponse as { response: string }).response?.trim() || originalPost.content;
 
     // Translate summary
     let translatedSummary = originalPost.summary;
     if (originalPost.summary) {
+      const summaryPrompt = `You are a professional technical translator. Translate this Korean blog summary to natural, professional English. Use standard technical terminology. IMPORTANT: Keep the translation under 200 characters. Return ONLY the translation, no explanations:
+
+${originalPost.summary}`;
       const summaryResponse = await c.env.AI.run(
         "@cf/meta/llama-4-scout-17b-16e-instruct" as Parameters<typeof c.env.AI.run>[0],
-        {
-          prompt: `Translate to English in under 200 characters:\n\n${originalPost.summary}`,
-          max_tokens: 100,
-        }
+        { prompt: summaryPrompt, max_tokens: 100 }
       );
       translatedSummary = (summaryResponse as { response: string }).response?.trim() || originalPost.summary;
       if (translatedSummary.length > 200) {
