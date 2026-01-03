@@ -342,8 +342,18 @@ admin.post("/posts/:postId/translate", async (c) => {
       throw new ValidationError("Translation already exists");
     }
 
-    // Translate using Cloudflare AI
-    const translatePrompt = `# Role
+    // Translate title
+    const titlePrompt = `You are a professional technical translator. Translate this Korean blog title to natural, professional English. Use standard technical terminology. Return ONLY the translated title, no explanations or quotes:
+
+${originalPost.title}`;
+    const titleResponse = await c.env.AI.run(
+      "@cf/meta/llama-4-scout-17b-16e-instruct" as Parameters<typeof c.env.AI.run>[0],
+      { prompt: titlePrompt, max_tokens: 200 }
+    );
+    const translatedTitle = (titleResponse as { response: string }).response.trim().replace(/^["']|["']$/g, "");
+
+    // Translate content
+    const contentPrompt = `# Role
 You are a professional technical translator and content editor specialized in localizing Korean blog posts for a global English-speaking audience.
 
 # Task
@@ -359,26 +369,15 @@ Your translation must be contextually accurate and maintain a professional yet e
 4. **Natural Localization**: Avoid literal word-for-word translation. Ensure the flow is natural for native English speakers while keeping the original intent.
 
 # Output Format
-Return ONLY the translated content. First line should be the translated title, followed by the translated content.
-Do not add any explanations, notes, or markers.
+Return ONLY the translated content. Do not add any explanations, notes, or markers.
 
 # Input Content
-Title: ${originalPost.title}
-
-Content:
 ${originalPost.content}`;
-
-    const aiResponse = await c.env.AI.run(
+    const contentResponse = await c.env.AI.run(
       "@cf/meta/llama-4-scout-17b-16e-instruct" as Parameters<typeof c.env.AI.run>[0],
-      { prompt: translatePrompt, max_tokens: 4096 }
+      { prompt: contentPrompt, max_tokens: 8192 }
     );
-
-    const translatedText = (aiResponse as { response: string }).response;
-
-    // Parse translated title and content
-    const lines = translatedText.trim().split("\n");
-    const translatedTitle = lines[0].replace(/^#*\s*/, "").trim();
-    const translatedContent = lines.slice(1).join("\n").trim();
+    const translatedContent = (contentResponse as { response: string }).response.trim();
 
     // Translate summary if exists
     let translatedSummary = originalPost.summary;
@@ -393,23 +392,18 @@ ${originalPost.summary}`;
       translatedSummary = (summaryResponse as { response: string }).response.trim();
     }
 
-    // Generate English slug
-    const englishSlug = translatedTitle
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "");
-
-    // Create the translated post as draft
+    // Create the translated post as draft (keep original slug and createdAt)
     const postService = new PostService(c.env.DB, c.env.VECTORIZE, c.env.AI);
     const translatedPost = await postService.createPost({
       title: translatedTitle,
       content: translatedContent,
       summary: translatedSummary,
-      slug: englishSlug,
+      slug: originalPost.slug,
       tags: await postRepository.getTagsByPostId(postId),
       state: "draft",
       locale: targetLocale,
       originalPostId: postId,
+      createdAt: originalPost.created_at,
     }, logger);
 
     logger.info("Post translated", { originalPostId: postId, translatedPostId: translatedPost.id, targetLocale });
