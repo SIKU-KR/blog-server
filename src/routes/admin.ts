@@ -304,17 +304,30 @@ admin.post("/posts/:postId/translate", async (c) => {
     }
 
     // Translate using Cloudflare AI
-    const translatePrompt = `You are a professional translator. Translate the following Korean blog post to English.
-Keep the markdown formatting intact. Only translate the text content.
-Do not add any explanations or notes. Return only the translated content.
+    const translatePrompt = `# Role
+You are a professional technical translator and content editor specialized in localizing Korean blog posts for a global English-speaking audience.
 
+# Task
+Translate the provided Korean Markdown content into natural, high-quality English.
+Your translation must be contextually accurate and maintain a professional yet engaging tone.
+
+# Strict Constraints
+1. **Preserve Markdown Syntax**: Do not alter any Markdown formatting, including headers (##), lists (-, 1.), bolding (**), tables, and blockquotes (>).
+2. **Non-Translatable Elements**:
+    - **Images & Links**: Absolutely do NOT translate or modify the contents inside \`![]()\` and \`[]()\`. Keep the URLs and alternative text paths exactly as they are in the original.
+    - **Code Blocks**: Do not change the code inside triple backticks (\`\`\`). However, if there are comments inside the code written in Korean, translate them into English.
+3. **Technical Terminology**: Use standard industry terms (e.g., use "Refactoring" instead of a literal translation of "코드 개선"). Keep widely used English technical terms as they are.
+4. **Natural Localization**: Avoid literal word-for-word translation. Ensure the flow is natural for native English speakers while keeping the original intent.
+
+# Output Format
+Return ONLY the translated content. First line should be the translated title, followed by the translated content.
+Do not add any explanations, notes, or markers.
+
+# Input Content
 Title: ${originalPost.title}
 
 Content:
-${originalPost.content}
-
----
-Translated Title:`;
+${originalPost.content}`;
 
     const aiResponse = await c.env.AI.run(
       "@cf/meta/llama-4-scout-17b-16e-instruct" as Parameters<typeof c.env.AI.run>[0],
@@ -331,7 +344,8 @@ Translated Title:`;
     // Translate summary if exists
     let translatedSummary = originalPost.summary;
     if (originalPost.summary) {
-      const summaryPrompt = `Translate this Korean text to English. Return only the translation, no explanations:
+      const summaryPrompt = `You are a professional technical translator. Translate this Korean blog summary to natural, professional English. Use standard technical terminology. Return ONLY the translation, no explanations:
+
 ${originalPost.summary}`;
       const summaryResponse = await c.env.AI.run(
         "@cf/meta/llama-4-scout-17b-16e-instruct" as Parameters<typeof c.env.AI.run>[0],
