@@ -353,26 +353,22 @@ ${originalPost.title}`;
     const translatedTitle = (titleResponse as { response: string }).response?.trim() || originalPost.title;
 
     // Translate content
-    const contentPrompt = `# Role
-You are a professional technical translator and content editor specialized in localizing Korean blog posts for a global English-speaking audience.
+    const contentPrompt = `You are a professional technical translator specializing in Korean to English translation for technical blog posts.
 
-# Task
-Translate the provided Korean Markdown content into natural, high-quality English.
-Your translation must be contextually accurate and maintain a professional yet engaging tone.
+Translate the Korean Markdown content inside <korean_content> tags to natural, professional English.
 
-# Strict Constraints
-1. **Preserve Markdown Syntax**: Do not alter any Markdown formatting, including headers (##), lists (-, 1.), bolding (**), tables, and blockquotes (>).
-2. **Non-Translatable Elements**:
-    - **Images & Links**: Absolutely do NOT translate or modify the contents inside \`![]()\` and \`[]()\`. Keep the URLs and alternative text paths exactly as they are in the original.
-    - **Code Blocks**: Do not change the code inside triple backticks (\`\`\`). However, if there are comments inside the code written in Korean, translate them into English.
-3. **Technical Terminology**: Use standard industry terms (e.g., use "Refactoring" instead of a literal translation of "코드 개선"). Keep widely used English technical terms as they are.
-4. **Natural Localization**: Avoid literal word-for-word translation. Ensure the flow is natural for native English speakers while keeping the original intent.
+Rules:
+- Preserve all Markdown formatting (headers, lists, bold, code blocks, etc.)
+- Do NOT modify image links ![...](...) or URLs [...](...)
+- Translate Korean comments inside code blocks to English
+- Use standard technical terminology
+- Make it natural for English speakers
 
-# Output Format
-Return ONLY the translated content. Do not add any explanations, notes, or markers.
+Return ONLY the translated content without any tags or explanations.
 
-# Input Content
-${originalPost.content}`;
+<korean_content>
+${originalPost.content}
+</korean_content>`;
     const contentResponse = await c.env.AI.run(
       "@cf/meta/llama-4-scout-17b-16e-instruct" as Parameters<typeof c.env.AI.run>[0],
       { prompt: contentPrompt, max_tokens: 8192 }
