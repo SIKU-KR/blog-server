@@ -513,6 +513,7 @@ export class PostService {
     if (this.embeddingService) {
       relatedPosts = await this.embeddingService.findSimilarPosts(
         result.data.id,
+        locale,
         4,
         logger
       );
@@ -550,6 +551,7 @@ export class PostService {
       post.slug,
       post.state,
       post.state === "published" ? post.created_at : null,
+      post.locale,
       logger
     );
 
@@ -570,6 +572,7 @@ export class PostService {
       post.slug,
       post.state,
       post.state === "published" ? post.createdAt : null,
+      post.locale,
       logger
     ).catch((err) => {
       logger?.warn("Background embedding failed", {

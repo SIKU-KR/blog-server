@@ -241,6 +241,7 @@ admin.post("/posts/embed/bulk", async (c) => {
         slug: p.slug,
         state: p.state,
         publishedAt: p.state === "published" ? p.created_at : null,
+        locale: p.locale,
       })),
       logger
     );

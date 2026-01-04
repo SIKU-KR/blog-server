@@ -86,6 +86,7 @@ export class EmbeddingService {
     slug: string,
     state: "draft" | "published",
     publishedAt: string | null,
+    locale: string,
     logger?: Logger
   ): Promise<EmbeddingResult> {
     try {
@@ -98,6 +99,7 @@ export class EmbeddingService {
         slug,
         state,
         publishedAt,
+        locale,
       };
 
       await this.vectorize.upsert([
@@ -133,6 +135,7 @@ export class EmbeddingService {
    */
   async findSimilarPosts(
     postId: number,
+    locale: string = "ko",
     topK: number = 4,
     logger?: Logger
   ): Promise<RelatedPost[]> {
@@ -147,9 +150,9 @@ export class EmbeddingService {
         return [];
       }
 
-      // Query for similar vectors
+      // Query for similar vectors - get more results to account for locale filtering
       const results = await this.vectorize.query(vectors[0].values, {
-        topK: topK + 1, // Get extra to filter out self
+        topK: (topK + 1) * 3, // Get extra to filter out self and other locales
         returnMetadata: "all",
       });
 
@@ -160,6 +163,8 @@ export class EmbeddingService {
           const metadata = match.metadata as unknown as PostVectorMetadata;
           // Exclude unpublished or scheduled posts (publishedAt > now)
           if (metadata.publishedAt && metadata.publishedAt > now) return false;
+          // Filter by locale - only show posts in the same language
+          if (metadata.locale && metadata.locale !== locale) return false;
           return true;
         })
         .slice(0, topK)
@@ -175,6 +180,7 @@ export class EmbeddingService {
 
       logger?.debug("Found similar posts", {
         sourcePostId: postId,
+        locale,
         count: relatedPosts.length,
       });
 
@@ -182,6 +188,7 @@ export class EmbeddingService {
     } catch (error) {
       logger?.warn("Failed to find similar posts", {
         postId,
+        locale,
         error: error instanceof Error ? error.message : "Unknown error",
       });
 
@@ -220,6 +227,7 @@ export class EmbeddingService {
       slug: string;
       state: "draft" | "published";
       publishedAt: string | null;
+      locale: string;
     }>,
     logger?: Logger
   ): Promise<BulkEmbeddingResult> {
@@ -238,6 +246,7 @@ export class EmbeddingService {
         post.slug,
         post.state,
         post.publishedAt,
+        post.locale,
         logger
       );
 

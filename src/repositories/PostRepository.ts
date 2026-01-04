@@ -420,7 +420,7 @@ export class PostRepository {
    */
   async findAllForEmbedding(): Promise<Post[]> {
     const query = `
-      SELECT id, slug, title, content, summary, state, created_at, updated_at, views
+      SELECT id, slug, title, content, summary, state, locale, created_at, updated_at, views
       FROM posts
       ORDER BY created_at DESC
     `;

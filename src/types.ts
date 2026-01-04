@@ -138,6 +138,7 @@ export interface PostVectorMetadata {
   slug: string;
   state: "draft" | "published";
   publishedAt: string | null;
+  locale: string;
 }
 
 export interface RelatedPost {
