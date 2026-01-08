@@ -22,22 +22,22 @@ export const postQueries = {
   selectPublishedBySlug: `
     SELECT id, slug, title, content, summary, state, locale, original_post_id, created_at, updated_at, views
     FROM posts
-    WHERE slug = ? AND state = 'published' AND created_at <= datetime('now')
+    WHERE slug = ? AND state = 'published' AND created_at <= strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
   `,
   selectPublishedBySlugAndLocale: `
     SELECT id, slug, title, content, summary, state, locale, original_post_id, created_at, updated_at, views
     FROM posts
-    WHERE slug = ? AND locale = ? AND state = 'published' AND created_at <= datetime('now')
+    WHERE slug = ? AND locale = ? AND state = 'published' AND created_at <= strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
   `,
   selectPublishedById: `
     SELECT id, slug, title, content, summary, state, locale, original_post_id, created_at, updated_at, views
     FROM posts
-    WHERE id = ? AND state = 'published' AND created_at <= datetime('now')
+    WHERE id = ? AND state = 'published' AND created_at <= strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
   `,
   incrementViews: `
     UPDATE posts
     SET views = views + 1
-    WHERE id = ? AND state = 'published' AND created_at <= datetime('now')
+    WHERE id = ? AND state = 'published' AND created_at <= strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
   `,
   selectViews: "SELECT views FROM posts WHERE id = ?",
   // Find translation of a post
@@ -76,7 +76,7 @@ export const tagQueries = {
     FROM tags t
     INNER JOIN post_tags pt ON pt.tag_id = t.id
     INNER JOIN posts p ON p.id = pt.post_id
-    WHERE p.locale = ? AND p.state = 'published' AND p.created_at <= datetime('now')
+    WHERE p.locale = ? AND p.state = 'published' AND p.created_at <= strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
     GROUP BY t.id, t.name, t.created_at
     HAVING COUNT(p.id) > 0
     ORDER BY t.name ASC
@@ -84,7 +84,7 @@ export const tagQueries = {
   selectAllPublishedSlugs: `
     SELECT slug
     FROM posts
-    WHERE state = 'published' AND created_at <= datetime('now')
+    WHERE state = 'published' AND created_at <= strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
     ORDER BY created_at DESC
   `,
 };
@@ -104,6 +104,6 @@ export const commentQueries = {
     VALUES (?, ?, ?, ?, ?)
   `,
   checkPostExists: `
-    SELECT id FROM posts WHERE id = ? AND state = 'published' AND created_at <= datetime('now')
+    SELECT id FROM posts WHERE id = ? AND state = 'published' AND created_at <= strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
   `,
 };

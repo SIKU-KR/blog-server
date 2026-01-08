@@ -176,7 +176,7 @@ export class PostRepository {
         FROM posts p
         WHERE p.state = 'published'
           AND p.locale = ?
-          AND p.created_at <= datetime('now')
+          AND p.created_at <= strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
           AND p.id IN (
             SELECT DISTINCT pt.post_id
             FROM post_tags pt
@@ -195,7 +195,7 @@ export class PostRepository {
             p.views
           ) as views
         FROM posts p
-        WHERE p.state = 'published' AND p.locale = ? AND p.created_at <= datetime('now')
+        WHERE p.state = 'published' AND p.locale = ? AND p.created_at <= strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
         ORDER BY ${orderClause}
         LIMIT ? OFFSET ?
       `;
@@ -220,14 +220,14 @@ export class PostRepository {
         FROM posts p
         INNER JOIN post_tags pt ON p.id = pt.post_id
         INNER JOIN tags t ON pt.tag_id = t.id
-        WHERE t.name = ? AND p.locale = ? AND p.state = 'published' AND p.created_at <= datetime('now')
+        WHERE t.name = ? AND p.locale = ? AND p.state = 'published' AND p.created_at <= strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
       `;
       bindings = [tag, locale];
     } else {
       query = `
         SELECT COUNT(*) as total
         FROM posts
-        WHERE state = 'published' AND locale = ? AND created_at <= datetime('now')
+        WHERE state = 'published' AND locale = ? AND created_at <= strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
       `;
       bindings = [locale];
     }
