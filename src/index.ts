@@ -73,7 +73,7 @@ app.use("*", async (c, next) => {
   const corsMiddleware = cors({
     origin: c.env.ALLOWED_ORIGINS || "*",
     allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowHeaders: ["Content-Type", "Authorization"],
+    allowHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
     maxAge: 86400,
   });
   return corsMiddleware(c, next);
